@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Iron Log" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.svg" />
+  <title>Iron Log</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+    /* Smooth iOS scrolling */
+    * { -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-type="module">
+    const { useState, useMemo, useCallback, useEffect, useRef } = React;
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } = Recharts;
+
+    // âââ LocalStorage persistence âââ
+    const STORAGE_KEY = 'iron-log-data';
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) { console.warn('Failed to load data', e); }
+      return null;
+    }
+
+    function saveData(data) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) { console.warn('Failed to save data', e); }
+    }
+
+    // âââ Sample Data âââ
+    const SAMPLE_EXERCISES = ["Bench Press","Squat","Deadlift","Overhead Press","Barbell Row","Pull-Up","Dumbbell Curl","Tricep Pushdown","Leg Press","Romanian Deadlift","Lat Pulldown","Cable Fly","Hip Thrust","Lunges","Calf Raise"];
+
+    const SAMPLE_TEMPLATES = [
+      { id: 1, name: "Push Day", exercises: [
+        { name: "Bench Press", sets: [{ reps: 8, weight: 80 },{ reps: 8, weight: 80 },{ reps: 6, weight: 85 }] },
+        { name: "Overhead Press", sets: [{ reps: 10, weight: 40 },{ reps: 10, weight: 40 },{ reps: 8, weight: 45 }] },
+        { name: "Tricep Pushdown", sets: [{ reps: 12, weight: 25 },{ reps: 12, weight: 25 },{ reps: 10, weight: 30 }] },
+      ]},
+      { id: 2, name: "Pull Day", exercises: [
+        { name: "Deadlift", sets: [{ reps: 5, weight: 120 },{ reps: 5, weight: 120 },{ reps: 3, weight: 130 }] },
+        { name: "Barbell Row", sets: [{ reps: 8, weight: 60 },{ reps: 8, weight: 60 },{ reps: 8, weight: 60 }] },
+        { name: "Pull-Up", sets: [{ reps: 8, weight: 0 },{ reps: 7, weight: 0 },{ reps: 6, weight: 0 }] },
+        { name: "Dumbbell Curl", sets: [{ reps: 12, weight: 14 },{ reps: 12, weight: 14 },{ reps: 10, weight: 16 }] },
+      ]},
+      { id: 3, name: "Leg Day", exercises: [
+        { name: "Squat", sets: [{ reps: 5, weight: 100 },{ reps: 5, weight: 100 },{ reps: 5, weight: 100 }] },
+        { name: "Leg Press", sets: [{ reps: 10, weight: 160 },{ reps: 10, weight: 160 },{ reps: 10, weight: 160 }] },
+        { name: "Romanian Deadlift", sets: [{ reps: 10, weight: 70 },{ reps: 10, weight: 70 },{ reps: 10, weight: 70 }] },
+      ]},
+    ];
+
+    const SAMPLE_TEMPLATES_2 = [
+      { id: 101, name: "Upper Body", exercises: [
+        { name: "Bench Press", sets: [{ reps: 10, weight: 40 },{ reps: 10, weight: 40 },{ reps: 8, weight: 45 }] },
+        { name: "Lat Pulldown", sets: [{ reps: 12, weight: 35 },{ reps: 12, weight: 35 },{ reps: 10, weight: 40 }] },
+        { name: "Cable Fly", sets: [{ reps: 12, weight: 10 },{ reps: 12, weight: 10 },{ reps: 12, weight: 12 }] },
+      ]},
+      { id: 102, name: "Lower Body", exercises: [
+        { name: "Hip Thrust", sets: [{ reps: 10, weight: 60 },{ reps: 10, weight: 60 },{ reps: 8, weight: 70 }] },
+        { name: "Squat", sets: [{ reps: 8, weight: 50 },{ reps: 8, weight: 50 },{ reps: 8, weight: 55 }] },
+        { name: "Lunges", sets: [{ reps: 12, weight: 16 },{ reps: 12, weight: 16 },{ reps: 12, weight: 16 }] },
+        { name: "Calf Raise", sets: [{ reps: 15, weight: 40 },{ reps: 15, weight: 40 },{ reps: 15, weight: 40 }] },
+      ]},
+    ];
+
+    function generateSampleWorkouts(templates) {
+      const workouts = [];
+      const today = new Date();
+      for (let i = 14; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i * 2);
+        const t = templates[i % templates.length];
+        workouts.push({
+          id: Date.now() - i * 200000 + Math.random() * 1000,
+          date: d.toISOString().slice(0, 10),
+          name: t.name,
+          exercises: t.exercises.map(ex => ({
+            name: ex.name,
+            sets: ex.sets.map(s => ({
+              reps: s.reps + Math.floor(Math.random() * 2),
+              weight: Math.round((s.weight + Math.floor(i / 10) * 2.5) * 2) / 2,
+            })),
+          })),
+        });
+      }
+      return workouts;
+    }
+
+    function createDefaultProfiles() {
+      return [
+        { id: "p1", name: "Jim", avatar: "J", themeIndex: 0, workouts: generateSampleWorkouts(SAMPLE_TEMPLATES), templates: [...SAMPLE_TEMPLATES] },
+        { id: "p2", name: "Partner", avatar: "P", themeIndex: 1, workouts: generateSampleWorkouts(SAMPLE_TEMPLATES_2), templates: [...SAMPLE_TEMPLATES_2] },
+      ];
+    }
+
+    // âââ Profile themes âââ
+    const THEMES = [
+      { key: "blue", primary: "#2563eb", bg: "bg-blue-600", hover: "hover:bg-blue-700", ring: "ring-blue-500", light: "bg-blue-50", text: "text-blue-600", gradient: "from-blue-600 to-blue-500" },
+      { key: "rose", primary: "#e11d48", bg: "bg-rose-600", hover: "hover:bg-rose-700", ring: "ring-rose-500", light: "bg-rose-50", text: "text-rose-600", gradient: "from-rose-600 to-rose-500" },
+      { key: "emerald", primary: "#059669", bg: "bg-emerald-600", hover: "hover:bg-emerald-700", ring: "ring-emerald-500", light: "bg-emerald-50", text: "text-emerald-600", gradient: "from-emerald-600 to-emerald-500" },
+      { key: "violet", primary: "#7c3aed", bg: "bg-violet-600", hover: "hover:bg-violet-700", ring: "ring-violet-500", light: "bg-violet-50", text: "text-violet-600", gradient: "from-violet-600 to-violet-500" },
+      { key: "amber", primary: "#d97706", bg: "bg-amber-600", hover: "hover:bg-amber-700", ring: "ring-amber-500", light: "bg-amber-50", text: "text-amber-600", gradient: "from-amber-600 to-amber-500" },
+    ];
+
+    // âââ Utility helpers âââ
+    const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    const e1RM = (w, r) => r === 1 ? w : +(w * (1 + r / 30)).toFixed(1);
+    const bestSet = (sets) => sets.reduce((best, s) => e1RM(s.weight, s.reps) > e1RM(best.weight, best.reps) ? s : best, sets[0]);
+    const uid = () => Date.now() + Math.random();
+
+    // âââ Shared UI âââ
+    function Badge({ children, color = "blue" }) {
+      const colors = { blue: "bg-blue-100 text-blue-800", green: "bg-green-100 text-green-800", yellow: "bg-yellow-100 text-yellow-800", gray: "bg-gray-100 text-gray-700", purple: "bg-purple-100 text-purple-800" };
+      return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${colors[color] || ""}`}>{children}</span>;
+    }
+
+    function Card({ children, className = "" }) {
+      return <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-5 ${className}`}>{children}</div>;
+    }
+
+    function Button({ children, onClick, variant = "primary", size = "md", className = "", theme }) {
+      const base = "font-semibold rounded-xl transition-all duration-150 active:scale-95 focus:outline-none";
+      const v = {
+        primary: theme ? `${theme.bg} ${theme.hover} text-white` : "bg-blue-600 hover:bg-blue-700 text-white",
+        secondary: "bg-gray-100 hover:bg-gray-200 text-gray-800",
+        ghost: "bg-transparent hover:bg-gray-100 text-gray-600",
+        success: "bg-green-600 hover:bg-green-700 text-white",
+      };
+      const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2 text-sm", lg: "px-6 py-3 text-base" };
+      return <button onClick={onClick} className={`${base} ${v[variant] || v.primary} ${sizes[size]} ${className}`}>{children}</button>;
+    }
+
+    function Input({ label, ...props }) {
+      return (
+        <div className="flex flex-col gap-1 flex-1">
+          {label && <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>}
+          <input className="border border-gray-200 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent" {...props} />
+        </div>
+      );
+    }
+
+    function Select({ label, options, ...props }) {
+      return (
+        <div className="flex flex-col gap-1">
+          {label && <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>}
+          <select className="border border-gray-200 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" {...props}>
+            {options.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+      );
+    }
+
+    // âââ Profile Switcher âââ
+    function ProfileSwitcher({ profiles, activeId, onSwitch, onAdd, onEdit }) {
+      const [showMenu, setShowMenu] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [newName, setNewName] = useState("");
+      const [addingNew, setAddingNew] = useState(false);
+      const [newProfileName, setNewProfileName] = useState("");
+      const [newProfileTheme, setNewProfileTheme] = useState(0);
+
+      const active = profiles.find(p => p.id === activeId);
+      const theme = THEMES[active?.themeIndex || 0];
+
+      const startEdit = (p) => { setEditing(p.id); setNewName(p.name); };
+      const saveEdit = () => { if (newName.trim() && editing) { onEdit(editing, { name: newName.trim(), avatar: newName.trim()[0].toUpperCase() }); setEditing(null); }};
+      const addProfile = () => {
+        if (newProfileName.trim()) {
+          onAdd({ id: "p" + uid(), name: newProfileName.trim(), avatar: newProfileName.trim()[0].toUpperCase(), themeIndex: newProfileTheme, workouts: [], templates: [] });
+          setNewProfileName(""); setAddingNew(false); setShowMenu(false);
+        }
+      };
+
+      return (
+        <div className="relative">
+          <button onClick={() => setShowMenu(!showMenu)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all ${showMenu ? "border-gray-300 shadow-md" : "border-gray-200"}`}>
+            <div className={`w-8 h-8 rounded-full ${theme.bg} text-white flex items-center justify-center text-sm font-bold`}>{active?.avatar}</div>
+            <span className="text-sm font-semibold text-gray-800 hidden sm:inline">{active?.name}</span>
+            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => { setShowMenu(false); setAddingNew(false); setEditing(null); }} />
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                <div className="p-3 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Profiles</p>
+                </div>
+                <div className="p-2">
+                  {profiles.map(p => {
+                    const t = THEMES[p.themeIndex || 0];
+                    const isActive = p.id === activeId;
+                    return (
+                      <div key={p.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isActive ? t.light : "hover:bg-gray-50"}`}>
+                        <button onClick={() => { onSwitch(p.id); setShowMenu(false); }} className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`w-9 h-9 rounded-full ${t.bg} text-white flex items-center justify-center text-sm font-bold flex-shrink-0`}>{p.avatar}</div>
+                          {editing === p.id ? (
+                            <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveEdit()} onClick={e => e.stopPropagation()} className="text-sm font-medium border border-gray-300 rounded-lg px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                          ) : (
+                            <div className="text-left min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{p.name}</p>
+                              <p className="text-xs text-gray-400">{p.workouts.length} workouts</p>
+                            </div>
+                          )}
+                        </button>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {editing === p.id ? (
+                            <button onClick={saveEdit} className="text-xs text-green-600 hover:text-green-800 font-medium px-2 py-1">Save</button>
+                          ) : (
+                            <button onClick={(e) => { e.stopPropagation(); startEdit(p); }} className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                          )}
+                          {isActive && <div className={`w-2 h-2 rounded-full ${t.bg}`} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-gray-100 p-2">
+                  {addingNew ? (
+                    <div className="px-3 py-2 space-y-3">
+                      <input autoFocus placeholder="Name" value={newProfileName} onChange={e => setNewProfileName(e.target.value)} onKeyDown={e => e.key === "Enter" && addProfile()} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                      <div className="flex gap-2">
+                        {THEMES.map((t, i) => (
+                          <button key={t.key} onClick={() => setNewProfileTheme(i)} className={`w-7 h-7 rounded-full ${t.bg} transition-all ${newProfileTheme === i ? "ring-2 ring-offset-2 " + t.ring : "opacity-60 hover:opacity-100"}`} />
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={addProfile} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg px-3 py-2">Create</button>
+                        <button onClick={() => setAddingNew(false)} className="text-sm text-gray-500 px-3 py-2">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddingNew(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-gray-50">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-lg">+</div>
+                      <span className="text-sm font-medium">Add Profile</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // âââ Log Workout âââ
+    function LogWorkout({ templates, onSave, onSaveTemplate, exercises: exerciseList, theme }) {
+      const [name, setName] = useState("");
+      const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+      const [exercises, setExercises] = useState([]);
+      const [showTemplates, setShowTemplates] = useState(false);
+
+      const addExercise = () => setExercises(p => [...p, { id: uid(), name: exerciseList[0], sets: [{ reps: 8, weight: 0 }] }]);
+      const updateExercise = (i, field, val) => { const c = [...exercises]; c[i] = { ...c[i], [field]: val }; setExercises(c); };
+      const addSet = (i) => { const c = [...exercises]; const last = c[i].sets[c[i].sets.length - 1] || { reps: 8, weight: 0 }; c[i] = { ...c[i], sets: [...c[i].sets, { ...last }] }; setExercises(c); };
+      const removeSet = (ei, si) => { const c = [...exercises]; c[ei] = { ...c[ei], sets: c[ei].sets.filter((_, j) => j !== si) }; setExercises(c); };
+      const updateSet = (ei, si, field, val) => { const c = [...exercises]; const sets = [...c[ei].sets]; sets[si] = { ...sets[si], [field]: parseFloat(val) || 0 }; c[ei] = { ...c[ei], sets }; setExercises(c); };
+      const removeExercise = (i) => setExercises(p => p.filter((_, j) => j !== i));
+      const loadTemplate = (t) => { setName(t.name); setExercises(t.exercises.map(ex => ({ id: uid(), name: ex.name, sets: ex.sets.map(s => ({ ...s })) }))); setShowTemplates(false); };
+      const saveAsTemplate = () => { if (!name.trim() || exercises.length === 0) return; onSaveTemplate({ id: uid(), name: name.trim(), exercises: exercises.map(e => ({ name: e.name, sets: e.sets.map(s => ({ reps: s.reps, weight: s.weight })) })) }); };
+      const save = () => { if (exercises.length === 0) return; onSave({ id: uid(), date, name: name.trim() || "Workout", exercises: exercises.map(({ id, ...rest }) => rest) }); setName(""); setExercises([]); };
+
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Log Workout</h2>
+            <Button variant="secondary" size="sm" onClick={() => setShowTemplates(!showTemplates)}>{showTemplates ? "Hide" : "Templates"}</Button>
+          </div>
+
+          {showTemplates && (
+            <Card className="bg-gray-50 border-dashed">
+              <p className="text-xs font-medium text-gray-500 mb-2">SAVED TEMPLATES</p>
+              {templates.length === 0 ? <p className="text-sm text-gray-400">No templates yet.</p> : (
+                <div className="flex flex-wrap gap-2">
+                  {templates.map(t => (
+                    <button key={t.id} onClick={() => loadTemplate(t)} className="px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-blue-400 text-sm font-medium text-gray-700">
+                      {t.name} <span className="text-gray-400">({t.exercises.length})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          <Card>
+            <div className="flex gap-3 mb-4">
+              <Input label="Workout Name" placeholder="e.g. Push Day" value={name} onChange={e => setName(e.target.value)} />
+              <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-4">
+              {exercises.map((ex, ei) => (
+                <div key={ex.id} className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Select options={exerciseList} value={ex.name} onChange={e => updateExercise(ei, "name", e.target.value)} />
+                    <button onClick={() => removeExercise(ei)} className="ml-auto text-gray-400 hover:text-red-500 text-xl leading-none">&times;</button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-400 uppercase px-1">
+                      <span className="col-span-1">#</span>
+                      <span className="col-span-4">kg</span>
+                      <span className="col-span-4">Reps</span>
+                      <span className="col-span-3">1RM</span>
+                    </div>
+                    {ex.sets.map((s, si) => (
+                      <div key={si} className="grid grid-cols-12 gap-2 items-center">
+                        <span className="col-span-1 text-sm font-semibold text-gray-400">{si + 1}</span>
+                        <div className="col-span-4"><input type="number" inputMode="decimal" step="0.5" min="0" value={s.weight} onChange={e => updateSet(ei, si, "weight", e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                        <div className="col-span-4"><input type="number" inputMode="numeric" min="1" value={s.reps} onChange={e => updateSet(ei, si, "reps", e.target.value)} className="w-full border border-gray-200 rounded-lg px-2 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                        <div className="col-span-2 text-sm text-gray-500 font-mono">{e1RM(s.weight, s.reps)}</div>
+                        <button onClick={() => removeSet(ei, si)} className="col-span-1 text-gray-300 hover:text-red-500 text-sm">&times;</button>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => addSet(ei)} className="mt-2 text-xs text-blue-600 font-medium">+ Add Set</button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button variant="secondary" onClick={addExercise}>+ Add Exercise</Button>
+            </div>
+          </Card>
+
+          {exercises.length > 0 && (
+            <div className="flex gap-2">
+              <Button onClick={save} size="lg" theme={theme}>Save Workout</Button>
+              <Button variant="ghost" onClick={saveAsTemplate}>Save as Template</Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // âââ History âââ
+    function History({ workouts, prs }) {
+      const [expandedId, setExpandedId] = useState(null);
+      return (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">Workout History</h2>
+          {workouts.length === 0 ? (
+            <Card><p className="text-gray-400 text-center py-8">No workouts yet. Start logging!</p></Card>
+          ) : (
+            [...workouts].reverse().map(w => (
+              <Card key={w.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setExpandedId(expandedId === w.id ? null : w.id)}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-gray-900">{w.name}</span>
+                    <span className="ml-2 text-sm text-gray-400">{fmt(w.date)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge color="gray">{w.exercises.length} ex</Badge>
+                    <span className="text-gray-300">{expandedId === w.id ? "â¾" : "â¸"}</span>
+                  </div>
+                </div>
+                {expandedId === w.id && (
+                  <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                    {w.exercises.map((ex, i) => {
+                      const best = bestSet(ex.sets);
+                      const isPR = prs[ex.name] && e1RM(best.weight, best.reps) >= prs[ex.name].e1rm;
+                      return (
+                        <div key={i} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-gray-800">{ex.name}</span>
+                            {isPR && <Badge color="yellow">PR</Badge>}
+                          </div>
+                          <div className="grid grid-cols-3 gap-1 text-xs text-gray-500">
+                            {ex.sets.map((s, j) => <span key={j} className="font-mono">{s.weight}kg x {s.reps}</span>)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            ))
+          )}
+        </div>
+      );
+    }
+
+    // âââ PRs âââ
+    function PRBoard({ prs, theme }) {
+      const entries = Object.entries(prs).sort((a, b) => b[1].e1rm - a[1].e1rm);
+      return (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">Personal Records</h2>
+          {entries.length === 0 ? (
+            <Card><p className="text-gray-400 text-center py-8">No PRs yet.</p></Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {entries.map(([name, pr]) => (
+                <Card key={name}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900">{name}</p>
+                      <p className={`text-2xl font-bold mt-1 ${theme.text}`}>{pr.weight}kg x {pr.reps}</p>
+                      <p className="text-xs text-gray-400 mt-1">Est. 1RM: {pr.e1rm}kg</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge color="yellow">PR</Badge>
+                      <p className="text-xs text-gray-400 mt-2">{fmt(pr.date)}</p>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // âââ Progress âââ
+    function Progress({ workouts, theme }) {
+      const exerciseNames = useMemo(() => {
+        const names = new Set();
+        workouts.forEach(w => w.exercises.forEach(e => names.add(e.name)));
+        return [...names].sort();
+      }, [workouts]);
+      const [selected, setSelected] = useState(exerciseNames[0] || "");
+
+      const chartData = useMemo(() => {
+        if (!selected) return [];
+        return workouts.filter(w => w.exercises.some(e => e.name === selected)).map(w => {
+          const ex = w.exercises.find(e => e.name === selected);
+          const best = bestSet(ex.sets);
+          return { date: fmt(w.date), e1rm: e1RM(best.weight, best.reps), volume: ex.sets.reduce((a, s) => a + s.weight * s.reps, 0) };
+        });
+      }, [workouts, selected]);
+
+      const volumeByDay = useMemo(() => workouts.map(w => ({
+        date: fmt(w.date),
+        volume: w.exercises.reduce((a, ex) => a + ex.sets.reduce((b, s) => b + s.weight * s.reps, 0), 0),
+      })), [workouts]);
+
+      if (exerciseNames.length === 0) return <div className="space-y-4"><h2 className="text-xl font-bold text-gray-900">Progress</h2><Card><p className="text-gray-400 text-center py-8">Log some workouts to see charts.</p></Card></div>;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Progress</h2>
+            <Select options={exerciseNames} value={selected} onChange={e => setSelected(e.target.value)} />
+          </div>
+          <Card>
+            <p className="text-sm font-medium text-gray-500 mb-3">Est. 1RM â {selected}</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} unit="kg" />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }} />
+                <Line type="monotone" dataKey="e1rm" stroke={theme.primary} strokeWidth={2.5} dot={{ r: 3, fill: theme.primary }} name="Est. 1RM" />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium text-gray-500 mb-3">Volume â {selected}</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} unit="kg" />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }} />
+                <Bar dataKey="volume" fill="#7c3aed" radius={[6, 6, 0, 0]} name="Volume (kg)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium text-gray-500 mb-3">Total Workout Volume</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={volumeByDay}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} unit="kg" />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }} />
+                <Bar dataKey="volume" fill="#059669" radius={[6, 6, 0, 0]} name="Volume (kg)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+      );
+    }
+
+    // âââ Main App âââ
+    function App() {
+      const saved = useRef(loadData());
+      const [profiles, setProfiles] = useState(() => saved.current?.profiles || createDefaultProfiles());
+      const [activeProfileId, setActiveProfileId] = useState(() => saved.current?.activeProfileId || "p1");
+      const [tab, setTab] = useState("log");
+      const [exercises] = useState(SAMPLE_EXERCISES);
+      const [toast, setToast] = useState(null);
+
+      // Auto-save on every change
+      useEffect(() => {
+        saveData({ profiles, activeProfileId });
+      }, [profiles, activeProfileId]);
+
+      const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+
+      const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0];
+      const theme = THEMES[activeProfile?.themeIndex || 0];
+      const workouts = activeProfile?.workouts || [];
+      const templates = activeProfile?.templates || [];
+
+      const updateProfile = useCallback((id, updater) => {
+        setProfiles(prev => prev.map(p => p.id === id ? (typeof updater === "function" ? updater(p) : { ...p, ...updater }) : p));
+      }, []);
+
+      const prs = useMemo(() => {
+        const map = {};
+        workouts.forEach(w => w.exercises.forEach(ex => {
+          const best = bestSet(ex.sets);
+          const est = e1RM(best.weight, best.reps);
+          if (!map[ex.name] || est > map[ex.name].e1rm) map[ex.name] = { weight: best.weight, reps: best.reps, e1rm: est, date: w.date };
+        }));
+        return map;
+      }, [workouts]);
+
+      const handleSave = (workout) => { updateProfile(activeProfileId, p => ({ ...p, workouts: [...p.workouts, workout] })); showToast("Workout saved!"); setTab("history"); };
+      const handleSaveTemplate = (template) => { updateProfile(activeProfileId, p => ({ ...p, templates: [...p.templates, template] })); showToast("Template saved!"); };
+      const handleAddProfile = (profile) => { setProfiles(prev => [...prev, profile]); setActiveProfileId(profile.id); showToast(`Welcome, ${profile.name}!`); };
+      const handleEditProfile = (id, updates) => { updateProfile(id, p => ({ ...p, ...updates })); showToast("Profile updated!"); };
+      const handleSwitchProfile = (id) => { setActiveProfileId(id); setTab("log"); };
+
+      const tabs = [
+        { key: "log", label: "Log", icon: "+" },
+        { key: "history", label: "History", icon: "\u2630" },
+        { key: "prs", label: "PRs", icon: "\u2605" },
+        { key: "progress", label: "Progress", icon: "\u2197" },
+      ];
+
+      const stats = useMemo(() => ({
+        total: workouts.length,
+        thisWeek: workouts.filter(w => { const d = new Date(w.date + "T00:00:00"); const wk = new Date(); wk.setDate(wk.getDate() - 7); return d >= wk; }).length,
+        totalVolume: workouts.reduce((a, w) => a + w.exercises.reduce((b, e) => b + e.sets.reduce((c, s) => c + s.weight * s.reps, 0), 0), 0),
+        prCount: Object.keys(prs).length,
+      }), [workouts, prs]);
+
+      // Update theme-color meta tag when profile changes
+      useEffect(() => {
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.primary);
+      }, [theme.primary]);
+
+      return (
+        <div className="min-h-screen bg-gray-50 pb-8">
+          {toast && <div className={`fixed top-4 right-4 z-50 ${theme.bg} text-white px-4 py-2 rounded-xl shadow-lg text-sm font-medium animate-bounce`}>{toast}</div>}
+
+          <div className="bg-white border-b border-gray-100 sticky top-0 z-40">
+            <div className="max-w-2xl mx-auto px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Iron Log</h1>
+                  <p className="text-xs text-gray-400">Strength training tracker</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-3 text-center">
+                    <div><p className="text-base font-bold text-gray-900">{stats.total}</p><p className="text-xs text-gray-400">Total</p></div>
+                    <div><p className={`text-base font-bold ${theme.text}`}>{stats.thisWeek}</p><p className="text-xs text-gray-400">Week</p></div>
+                    <div><p className="text-base font-bold text-purple-600">{(stats.totalVolume / 1000).toFixed(0)}t</p><p className="text-xs text-gray-400">Lifted</p></div>
+                  </div>
+                  <ProfileSwitcher profiles={profiles} activeId={activeProfileId} onSwitch={handleSwitchProfile} onAdd={handleAddProfile} onEdit={handleEditProfile} />
+                </div>
+              </div>
+
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {tabs.map(t => (
+                  <button key={t.key} onClick={() => setTab(t.key)} className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all ${tab === t.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>
+                    <span className="mr-0.5">{t.icon}</span> {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="max-w-2xl mx-auto px-4 py-5">
+            {tab === "log" && <LogWorkout templates={templates} onSave={handleSave} onSaveTemplate={handleSaveTemplate} exercises={exercises} theme={theme} />}
+            {tab === "history" && <History workouts={workouts} prs={prs} />}
+            {tab === "prs" && <PRBoard prs={prs} theme={theme} />}
+            {tab === "progress" && <Progress workouts={workouts} theme={theme} />}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+
+  <script>
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+          console.log('SW registered:', reg.scope);
+        }).catch(err => {
+          console.log('SW registration failed:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
