@@ -31,7 +31,7 @@
     const { useState, useMemo, useCallback, useEffect, useRef } = React;
     const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } = Recharts;
 
-    // âââ LocalStorage persistence âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ LocalStorage persistence Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     const STORAGE_KEY = 'iron-log-data';
 
     function loadData() {
@@ -48,7 +48,7 @@
       } catch (e) { console.warn('Failed to save data', e); }
     }
 
-    // âââ Sample Data âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Sample Data Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     const SAMPLE_EXERCISES = ["Bench Press","Squat","Deadlift","Overhead Press","Barbell Row","Pull-Up","Dumbbell Curl","Tricep Pushdown","Leg Press","Romanian Deadlift","Lat Pulldown","Cable Fly","Hip Thrust","Lunges","Calf Raise"];
 
     const SAMPLE_TEMPLATES = [
@@ -114,7 +114,7 @@
       ];
     }
 
-    // âââ Profile themes âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Profile themes Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     const THEMES = [
       { key: "blue", primary: "#2563eb", bg: "bg-blue-600", hover: "hover:bg-blue-700", ring: "ring-blue-500", light: "bg-blue-50", text: "text-blue-600", gradient: "from-blue-600 to-blue-500" },
       { key: "rose", primary: "#e11d48", bg: "bg-rose-600", hover: "hover:bg-rose-700", ring: "ring-rose-500", light: "bg-rose-50", text: "text-rose-600", gradient: "from-rose-600 to-rose-500" },
@@ -123,13 +123,13 @@
       { key: "amber", primary: "#d97706", bg: "bg-amber-600", hover: "hover:bg-amber-700", ring: "ring-amber-500", light: "bg-amber-50", text: "text-amber-600", gradient: "from-amber-600 to-amber-500" },
     ];
 
-    // âââ Utility helpers âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Utility helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
     const e1RM = (w, r) => r === 1 ? w : +(w * (1 + r / 30)).toFixed(1);
     const bestSet = (sets) => sets.reduce((best, s) => e1RM(s.weight, s.reps) > e1RM(best.weight, best.reps) ? s : best, sets[0]);
     const uid = () => Date.now() + Math.random();
 
-    // âââ Shared UI âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Shared UI Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function Badge({ children, color = "blue" }) {
       const colors = { blue: "bg-blue-100 text-blue-800", green: "bg-green-100 text-green-800", yellow: "bg-yellow-100 text-yellow-800", gray: "bg-gray-100 text-gray-700", purple: "bg-purple-100 text-purple-800" };
       return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${colors[color] || ""}`}>{children}</span>;
@@ -171,7 +171,7 @@
       );
     }
 
-    // âââ Profile Switcher âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Profile Switcher Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function ProfileSwitcher({ profiles, activeId, onSwitch, onAdd, onEdit }) {
       const [showMenu, setShowMenu] = useState(false);
       const [editing, setEditing] = useState(null);
@@ -266,7 +266,7 @@
       );
     }
 
-    // âââ Log Workout âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Log Workout Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function LogWorkout({ templates, onSave, onSaveTemplate, exercises: exerciseList, theme }) {
       const [name, setName] = useState("");
       const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -354,7 +354,7 @@
       );
     }
 
-    // âââ History âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ History Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function History({ workouts, prs }) {
       const [expandedId, setExpandedId] = useState(null);
       return (
@@ -372,7 +372,7 @@
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge color="gray">{w.exercises.length} ex</Badge>
-                    <span className="text-gray-300">{expandedId === w.id ? "â¾" : "â¸"}</span>
+                    <span className="text-gray-300">{expandedId === w.id ? "Ã¢ÂÂ¾" : "Ã¢ÂÂ¸"}</span>
                   </div>
                 </div>
                 {expandedId === w.id && (
@@ -384,7 +384,7 @@
                         <div key={i} className="bg-gray-50 rounded-lg p-3">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="font-medium text-gray-800">{ex.name}</span>
-                            {isPR && <Badge color="yellow">PR</Badge>}
+                            {isPR && <Badge color="yellow">PB</Badge>}
                           </div>
                           <div className="grid grid-cols-3 gap-1 text-xs text-gray-500">
                             {ex.sets.map((s, j) => <span key={j} className="font-mono">{s.weight}kg x {s.reps}</span>)}
@@ -401,14 +401,14 @@
       );
     }
 
-    // âââ PRs âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ PRs Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function PRBoard({ prs, theme }) {
       const entries = Object.entries(prs).sort((a, b) => b[1].e1rm - a[1].e1rm);
       return (
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-900">Personal Records</h2>
+          <h2 className="text-xl font-bold text-gray-900">Personal Bests</h2>
           {entries.length === 0 ? (
-            <Card><p className="text-gray-400 text-center py-8">No PRs yet.</p></Card>
+            <Card><p className="text-gray-400 text-center py-8">No PBs yet.</p></Card>
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {entries.map(([name, pr]) => (
@@ -420,7 +420,7 @@
                       <p className="text-xs text-gray-400 mt-1">Est. 1RM: {pr.e1rm}kg</p>
                     </div>
                     <div className="text-right">
-                      <Badge color="yellow">PR</Badge>
+                      <Badge color="yellow">PB</Badge>
                       <p className="text-xs text-gray-400 mt-2">{fmt(pr.date)}</p>
                     </div>
                   </div>
@@ -432,7 +432,7 @@
       );
     }
 
-    // âââ Progress âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Progress Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function Progress({ workouts, theme }) {
       const exerciseNames = useMemo(() => {
         const names = new Set();
@@ -464,7 +464,7 @@
             <Select options={exerciseNames} value={selected} onChange={e => setSelected(e.target.value)} />
           </div>
           <Card>
-            <p className="text-sm font-medium text-gray-500 mb-3">Est. 1RM â {selected}</p>
+            <p className="text-sm font-medium text-gray-500 mb-3">Est. 1RM Ã¢ÂÂ {selected}</p>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -476,7 +476,7 @@
             </ResponsiveContainer>
           </Card>
           <Card>
-            <p className="text-sm font-medium text-gray-500 mb-3">Volume â {selected}</p>
+            <p className="text-sm font-medium text-gray-500 mb-3">Volume Ã¢ÂÂ {selected}</p>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -503,7 +503,7 @@
       );
     }
 
-    // âââ Main App âââ
+    // Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Main App Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     function App() {
       const saved = useRef(loadData());
       const [profiles, setProfiles] = useState(() => saved.current?.profiles || createDefaultProfiles());
@@ -547,7 +547,7 @@
       const tabs = [
         { key: "log", label: "Log", icon: "+" },
         { key: "history", label: "History", icon: "\u2630" },
-        { key: "prs", label: "PRs", icon: "\u2605" },
+        { key: "prs", label: "PBs", icon: "\u2605" },
         { key: "progress", label: "Progress", icon: "\u2197" },
       ];
 
